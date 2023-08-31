@@ -1,0 +1,10 @@
+Makefile
+PSXflights
+*.dll
+*.o
+*.a
+*.lib
+.gitattributes
+*.aux
+*.log
+*.pdf
