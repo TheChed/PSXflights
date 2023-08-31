@@ -19,6 +19,7 @@ typedef struct ARPT {
     double latitude;
     double longitude;
     struct ARPT *next;
+    int visited; // if already visited
 } ARPT;
 
 ARPT **airports = NULL;
@@ -104,19 +105,22 @@ static ARPT *create_airport(void)
     return tmp;
 }
 
-static int readarpt(const char *name)
+static int readarpt(const char *name, const char *visited)
 {
-    FILE *fp;
+    FILE *fp, *fvisited;
     int nb = 0;
     char buffer[4096];
     char *token;
     ARPT *arpt = NULL;
 
     fp = fopen(name, "r");
+    fvisited = fopen(visited, "r");
+
     if (fp == NULL) {
         printf("Could not open %s. Exiting now\n", name);
         exit(EXIT_FAILURE);
     }
+
     while (fgets(buffer, sizeof buffer, fp) != NULL) {
         // ICAO ID
         token = strtok(buffer, ",");
@@ -134,6 +138,7 @@ static int readarpt(const char *name)
             strtok(NULL, ",");
             arpt->latitude = strtod(strtok(NULL, ","), NULL) / 180 * M_PI;
             arpt->longitude = strtod(strtok(NULL, ","), NULL) / 180 * M_PI;
+            arpt->visited = 0;
 
             if (insert(arpt) == 0) {
                 free(arpt);
@@ -141,6 +146,20 @@ static int readarpt(const char *name)
                 nb++;
             }
         }
+    }
+    if (fvisited == NULL) {
+        printf("Could not open %s. All airports will be included in result\n", visited);
+    } else {
+        while (fgets(buffer, sizeof buffer, fvisited) != NULL) {
+            buffer[strcspn(buffer, "\n")] = 0;
+            if (strlen(buffer) == 4) {
+                printf("Excluding: %s \n", airports[hash(buffer)]->ID);
+                if (airports[hash(buffer)] != NULL) {
+                    airports[hash(buffer)]->visited = 1;
+                }
+            }
+        }
+        fclose(fvisited);
     }
     fclose(fp);
     return nb;
@@ -185,13 +204,13 @@ void delete_liste(void)
     free(A);
 }
 
-double distance (const char *arpt1, const char *arpt2)
+double distance(const char *arpt1, const char *arpt2)
 {
     uint64_t idx1, idx2;
 
     idx1 = hash(arpt1);
     idx2 = hash(arpt2);
-    if (airports[idx1] == NULL || airports[idx2] == NULL) {
+    if (airports[idx1] == NULL || airports[idx2] == NULL || (airports[idx2]->visited == 1)) {
         return -1;
     }
 
@@ -231,34 +250,33 @@ int main(int argc, char **argv)
     int dest_airport_idx;
     double flight_time;
 
-    if (argc < 4) {
-        printf("Usage %s <RWY.csv> <ICAO> duration \n", argv[0]);
+    if (argc < 3) {
+        printf("Usage %s ICAO duration <opt:legs.txt>\n", argv[0]);
         return EXIT_FAILURE;
     }
-    if (strlen(argv[2]) != 4) {
+    if (strlen(argv[1]) != 4) {
         printf("Starting ICAO is invalid\n");
         return EXIT_FAILURE;
     }
 
-    flight_time = strtof(argv[3], NULL);
+    flight_time = strtof(argv[2], NULL);
     if (flight_time <= 0) {
         printf("Wrong duration of flight\n");
         return EXIT_FAILURE;
     }
 
     airports = create_table(NB);
-    nbairport = readarpt(argv[1]);
+    nbairport = readarpt("RWY.csv", "legs.txt");
 
     create_list(nbairport);
 
     // print_airports(nbairport);
-    printf("%d airports imported\n", nbairport);
-    printf("With %d collisions\n", nbcollision);
+    printf("%d airports imported with %d collisions\n", nbairport, nbcollision);
 
-    dest_airport_idx = find_destination(argv[2], flight_time);
+    dest_airport_idx = find_destination(argv[1], flight_time);
 
     if (dest_airport_idx > 0) {
-        printf("Found a destination: %s->%s: %.1f hours\n", argv[2], airports[dest_airport_idx]->ID,distance(argv[2], airports[dest_airport_idx]->ID) / SPEED/3600);
+        printf("Found a destination: %s->%s: %.1f hours\n", argv[1], airports[dest_airport_idx]->ID, distance(argv[1], airports[dest_airport_idx]->ID) / SPEED / 3600);
     } else {
         printf("No airport is within %.1f hours +/- 10%% flying time from %s\n", flight_time, argv[2]);
     }
