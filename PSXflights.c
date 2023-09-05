@@ -28,8 +28,7 @@ char (*A)[5];
 int nbairport;
 int nbcollision = 0;
 
-uint64_t hash(const char *s)
-{
+uint64_t hash(const char *s) {
     uint64_t result = FNVOFF;
 
     if (strlen(s) != 4)
@@ -43,8 +42,7 @@ uint64_t hash(const char *s)
     return result % NB;
 }
 
-static int insert(ARPT *airport)
-{
+static int insert(ARPT *airport) {
     uint64_t index;
     index = hash(airport->ID);
     if (airports[index]) {
@@ -67,15 +65,12 @@ static int insert(ARPT *airport)
     }
     return 1;
 }
-double dist(double lat1, double lat2, double long1, double long2)
-{
-    return 2 * EARTH_RAD *
-           (sqrt(pow(sin((lat2 - lat1) / 2), 2) +
-                 cos(lat1) * cos(lat2) * pow(sin((long2 - long1) / 2), 2)));
+double dist(double lat1, double lat2, double long1, double long2) {
+    return 2 * EARTH_RAD * asin(
+           (sqrt(pow(sin((lat2 - lat1) / 2), 2) + cos(lat1) * cos(lat2) * pow(sin((long2 - long1) / 2), 2))));
 }
 
-void print_airports(int N)
-{
+void print_airports(int N) {
     ARPT *a;
     for (int i = 0; i < N; i++) {
         printf("A[%d]: %s\n", i, A[i]);
@@ -94,19 +89,14 @@ void print_airports(int N)
     }
 }
 
-static ARPT **create_table(size_t size)
-{
-    return calloc(size, sizeof(ARPT *));
-}
+static ARPT **create_table(size_t size) { return calloc(size, sizeof(ARPT *)); }
 
-static ARPT *create_airport(void)
-{
+static ARPT *create_airport(void) {
     ARPT *tmp = malloc(sizeof(ARPT));
     return tmp;
 }
 
-static int readarpt(const char *name, const char *visited)
-{
+static int readarpt(const char *name, const char *visited) {
     FILE *fp, *fvisited;
     int nb = 0;
     char buffer[4096];
@@ -164,8 +154,7 @@ static int readarpt(const char *name, const char *visited)
     fclose(fp);
     return nb;
 }
-void delete_table(ARPT **table)
-{
+void delete_table(ARPT **table) {
     ARPT *tmp;
     for (int i = 0; i < NB; i++) {
         if (table[i] != NULL) {
@@ -181,8 +170,7 @@ void delete_table(ARPT **table)
     free(table);
 }
 
-void create_list(int nbarpt)
-{
+void create_list(int nbarpt) {
     int nb = 0;
     A = malloc(nbarpt * sizeof(*A));
     for (int i = 0; i < NB; i++) {
@@ -199,13 +187,9 @@ void create_list(int nbarpt)
         }
     }
 }
-void delete_liste(void)
-{
-    free(A);
-}
+void delete_liste(void) { free(A); }
 
-double distance(const char *arpt1, const char *arpt2)
-{
+double distance(const char *arpt1, const char *arpt2) {
     uint64_t idx1, idx2;
 
     idx1 = hash(arpt1);
@@ -214,11 +198,11 @@ double distance(const char *arpt1, const char *arpt2)
         return -1;
     }
 
-    return dist(airports[idx1]->latitude, airports[idx2]->latitude, airports[idx1]->longitude, airports[idx2]->longitude);
+    return dist(airports[idx1]->latitude, airports[idx2]->latitude, airports[idx1]->longitude,
+                airports[idx2]->longitude);
 }
 
-int find_destination(const char *depart, double expected_duration)
-{
+int find_destination(const char *depart, double expected_duration) {
 
     uint64_t arptidx;
     int nb, result = 0;
@@ -245,8 +229,7 @@ int find_destination(const char *depart, double expected_duration)
     return hash(A[result]);
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     int dest_airport_idx;
     double flight_time;
 
@@ -259,10 +242,12 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    flight_time = strtof(argv[2], NULL);
-    if (flight_time <= 0) {
-        printf("Wrong duration of flight\n");
-        return EXIT_FAILURE;
+    if (strlen(argv[2]) != 4) {
+        flight_time = strtof(argv[2], NULL);
+        if (flight_time <= 0) {
+            printf("Wrong duration of flight\n");
+            return EXIT_FAILURE;
+        }
     }
 
     airports = create_table(NB);
@@ -273,12 +258,18 @@ int main(int argc, char **argv)
     // print_airports(nbairport);
     printf("%d airports imported with %d collisions\n", nbairport, nbcollision);
 
-    dest_airport_idx = find_destination(argv[1], flight_time);
+    if (strlen(argv[2]) == 4) {
+        printf("Flight time between %s and %s: %.1f hours (%.1f nm)\n", argv[1], argv[2],  distance(argv[1], argv[2])/SPEED/3600,distance(argv[1], argv[2])/1000);
 
-    if (dest_airport_idx > 0) {
-        printf("Found a destination: %s->%s: %.1f hours\n", argv[1], airports[dest_airport_idx]->ID, distance(argv[1], airports[dest_airport_idx]->ID) / SPEED / 3600);
     } else {
-        printf("No airport is within %.1f hours +/- 10%% flying time from %s\n", flight_time, argv[2]);
+        dest_airport_idx = find_destination(argv[1], flight_time);
+
+        if (dest_airport_idx > 0) {
+            printf("Found a destination: %s->%s: %.1f hours\n", argv[1], airports[dest_airport_idx]->ID,
+                   distance(argv[1], airports[dest_airport_idx]->ID) / SPEED / 3600);
+        } else {
+            printf("No airport is within %.1f hours +/- 10%% flying time from %s\n", flight_time, argv[1]);
+        }
     }
     delete_table(airports);
     delete_liste();
